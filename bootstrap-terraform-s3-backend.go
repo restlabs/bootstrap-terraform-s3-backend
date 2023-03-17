@@ -1,70 +1,78 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/aws/aws-cdk-go/awscdk/v2"
-	// "github.com/aws/aws-cdk-go/awscdk/v2/awssqs"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awss3"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
 )
 
-type BootstrapTerraformS3BackendStackProps struct {
-	awscdk.StackProps
+type TerraformBackendStackProps struct {
+    awscdk.StackProps
+    BucketName  string
+    TableName   string
 }
 
-func NewBootstrapTerraformS3BackendStack(scope constructs.Construct, id string, props *BootstrapTerraformS3BackendStackProps) awscdk.Stack {
-	var sprops awscdk.StackProps
-	if props != nil {
-		sprops = props.StackProps
-	}
-	stack := awscdk.NewStack(scope, &id, &sprops)
+func NewTerraformBackendStack(scope constructs.Construct, id string, props *TerraformBackendStackProps) awscdk.Stack {
+    stack := awscdk.NewStack(scope, &id, &props.StackProps)
 
-	// The code that defines your stack goes here
+    // Create an S3 bucket for the Terraform backend.
+    awss3.NewBucket(stack, jsii.String("TerraformBackendBucket"), &awss3.BucketProps{
+        BucketName: jsii.String(props.BucketName),
+        Versioned:  jsii.Bool(true),
+    })
 
-	// example resource
-	// queue := awssqs.NewQueue(stack, jsii.String("BootstrapTerraformS3BackendQueue"), &awssqs.QueueProps{
-	// 	VisibilityTimeout: awscdk.Duration_Seconds(jsii.Number(300)),
-	// })
+    // Create a DynamoDB table for the Terraform lock.
+    awsdynamodb.NewTable(stack, jsii.String("TerraformLockTable"), &awsdynamodb.TableProps{
+        TableName:   jsii.String(props.TableName),
+        PartitionKey: &awsdynamodb.Attribute{
+            Name: jsii.String("LockID"),
+            Type: awsdynamodb.AttributeType_STRING,
+        },
+        BillingMode: awsdynamodb.BillingMode_PAY_PER_REQUEST,
+    })
 
-	return stack
+    return stack
 }
 
 func main() {
-	defer jsii.Close()
+    app := awscdk.NewApp(nil)
 
-	app := awscdk.NewApp(nil)
+    accountID := os.Getenv("CDK_AWS_ACCOUNT_ID")
+    if accountID == "" {
+        fmt.Println("Error: CDK_AWS_ACCOUNT_ID environment variable is not set")
+        os.Exit(1)
+    }
 
-	NewBootstrapTerraformS3BackendStack(app, "BootstrapTerraformS3BackendStack", &BootstrapTerraformS3BackendStackProps{
-		awscdk.StackProps{
-			Env: env(),
-		},
-	})
+    region := os.Getenv("CDK_AWS_REGION")
+    if region == "" {
+        region = "us-west-2"
+    }
 
-	app.Synth(nil)
-}
+    bucketName := os.Getenv("CDK_TF_BACKEND_BUCKET_NAME")
+    if bucketName == "" {
+        bucketName = "default-terraform-backend-bucket"
+    }
 
-// env determines the AWS environment (account+region) in which our stack is to
-// be deployed. For more information see: https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-func env() *awscdk.Environment {
-	// If unspecified, this stack will be "environment-agnostic".
-	// Account/Region-dependent features and context lookups will not work, but a
-	// single synthesized template can be deployed anywhere.
-	//---------------------------------------------------------------------------
-	return nil
+    tableName := os.Getenv("CDK_TF_LOCK_TABLE_NAME")
+    if tableName == "" {
+        tableName = "default-terraform-lock-table"
+    }
 
-	// Uncomment if you know exactly what account and region you want to deploy
-	// the stack to. This is the recommendation for production stacks.
-	//---------------------------------------------------------------------------
-	// return &awscdk.Environment{
-	//  Account: jsii.String("123456789012"),
-	//  Region:  jsii.String("us-east-1"),
-	// }
+    NewTerraformBackendStack(app, "TerraformBackendStack", &TerraformBackendStackProps{
+        StackProps: awscdk.StackProps{
+            Env: &awscdk.Environment{
+				Account: jsii.String(accountID),
+				Region:  jsii.String(region),
+			},
+        },
+        BucketName: bucketName,
+        TableName:  tableName,
+    })
 
-	// Uncomment to specialize this stack for the AWS Account and Region that are
-	// implied by the current CLI configuration. This is recommended for dev
-	// stacks.
-	//---------------------------------------------------------------------------
-	// return &awscdk.Environment{
-	//  Account: jsii.String(os.Getenv("CDK_DEFAULT_ACCOUNT")),
-	//  Region:  jsii.String(os.Getenv("CDK_DEFAULT_REGION")),
-	// }
+    app.Synth(nil)
 }

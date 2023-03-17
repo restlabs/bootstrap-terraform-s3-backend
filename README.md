@@ -1,12 +1,21 @@
-# Welcome to your CDK Go project!
+# bootstrap-terraform-s3-backend
 
-This is a blank project for CDK development with Go.
+An AWS CDK tool used to bootstrap an S3 Terraform backend with DynamoDB for state locking.
 
-The `cdk.json` file tells the CDK toolkit how to execute your app.
+## Environment Variables
+
+Functionality can be configured by setting these environment variables before synthesizing the Cloudformation stack definition.
+
+| Variable Name              |
+| -------------------------- |
+| CDK_AWS_ACCOUNT_ID         |
+| CDK_AWS_REGION             |
+| CDK_TF_BACKEND_BUCKET_NAME |
+| CDK_TF_LOCK_TABLE_NAME     |
 
 ## Useful commands
 
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
- * `go test`         run unit tests
+* `cdk deploy`      deploy this stack to your default AWS account/region
+* `cdk diff`        compare deployed stack with current state
+* `cdk synth`       emits the synthesized CloudFormation template
+* `go test`         run unit tests
